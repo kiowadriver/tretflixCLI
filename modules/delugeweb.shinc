@@ -1,0 +1,339 @@
+# avoid double inclusion
+if test "${delugeweb__imported+defined}" == "defined"; then
+  return 0
+fi
+delugeweb__imported=1
+
+
+# Service Status & App Config Output
+# ---------------------------------------------------------------------------------------
+
+function delugeweb__get_status() {
+  if service deluge-web status 2>&1 | grep -q "unrecognized service"; then
+    status="Not Installed"
+  elif service deluge-web status 2>&1 | egrep -q "start|running"; then
+    if ! ls -l /etc/init/deluge-web.override> /dev/null 2>&1; then
+      status="Enabled|Running"
+    else
+      status="Disabled|Running"
+    fi
+  elif ! ls -l /etc/init/deluge-web.override > /dev/null 2>&1; then
+    status="Enabled|Stopped"
+  else
+    status="Disabled|Stopped"
+  fi
+  echo "$status"
+}
+
+function delugeweb__show_config() {
+  status=$(delugeweb__get_status)
+
+  echo "Deluge-Web Config:"
+  echo "----------------------------"
+  echo "Status: $status"
+  if [ "$status" == "Enabled|Running" ]; then
+		password=$(delugeweb__get_password)
+		port=$(delugeweb__get_port)
+		defaultDaemonHost=$(delugeweb__get_defaultDaemonHost)
+		defaultDaemonPort=$(delugeweb__get_defaultDaemonPort)
+		ipv4=$(tools__get_ip)
+	
+		if echo "$(proxy__get_status)" | egrep -q "^Enabled|Running$"; then
+			url="http://$ipv4/delugeweb"
+		else
+			url="http://$ipv4:$port/"
+		fi
+		
+    echo "Web UI: $url"
+    echo
+    echo "Username: N/A"
+    echo "Password: $password"
+    echo "Default Deluge Daemon: $defaultDaemonHost:$defaultDaemonPort"
+  fi
+}
+
+
+# Service Controls
+# ---------------------------------------------------------------------------------------
+
+function delugeweb__enable() {
+  if echo "$(delugeweb__get_status)" | grep -q "^Disabled"; then
+    echo "* Enabling delugeweb"
+    rm -v /etc/init/deluge-web.override
+    delugeweb__stop
+  fi
+}
+
+function delugeweb__disable() {
+  if echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+    echo "* Disabling delugeweb"
+    delugeweb__stop
+    tar xf $configBundle --strip-components 2 -C /etc/init/ config/init/deluge-web.override
+    echo "added \`/etc/init/deluge-web.override'"
+  fi
+}
+
+function delugeweb__start() {
+  if echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+    for i in {1..3}; do
+      if [ $i -gt 1 ]; then
+        sleep 2
+      fi
+      if [ "$(delugeweb__get_status)" != "Enabled|Running" ]; then
+        service deluge-web start
+      else
+        break
+      fi
+    done
+  fi
+}
+
+function delugeweb__stop() {
+  for i in {1..3}; do
+    if [ $i -gt 1 ]; then
+      sleep 2
+    fi
+    if echo "$(delugeweb__get_status)" | grep -q "Running$"; then
+      service deluge-web stop
+    else
+      break
+    fi
+  done
+}
+
+
+# Get App Configuration
+# ---------------------------------------------------------------------------------------
+
+function delugeweb__get_password() {
+  password=$(grep "pwd_sha1" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",')
+
+  echo "$password"
+}
+
+function delugeweb__get_port() {
+  port=$(grep "port" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",')
+  echo "$port"
+}
+
+function delugeweb__get_defaultDaemonHost() {
+  defaultDaemonHost=$(grep "default_daemon" $delugewebConfig | awk -F ': ' '{print $2}' | tr -d '",' | awk -F ":" '{print $1}')
+
+  echo "$defaultDaemonHost"
+}
+
+function delugeweb__get_defaultDaemonPort() {
+  defaultDaemonPort=$(grep "<default_daemon>.*</default_daemon>" $delugewebConfig | awk -F ': ' '{print $2}' | tr -d '",' | awk -F ":" '{print $2}')
+  
+  echo "$defaultDaemonPort"
+}
+
+function delugeweb__get_delugeweb_settings() {
+  settings=$(sqlite3 $delugewebDB "SELECT Settings from DownloadClients WHERE Implementation='deluge'")
+  
+  echo "$settings"
+}
+
+function delugeweb__get_plexserver_settings() {
+  settings=$(sqlite3 $delugewebDB "SELECT Settings from Notifications WHERE Implementation='PlexServer'")
+  
+  echo "$settings"
+}
+
+
+# Set App Configuration
+# ---------------------------------------------------------------------------------------
+
+
+function delugeweb__set_password() {
+  password="$1"
+  password=$(echo "$password" | sed 's/\//\\\//g')
+
+  delugeweb__stop
+  #sed -i 's#\(<Password>\).*\(</Password>\)#\1'$password'\2#g' $delugewebConfig
+ echo "ERROR: Not sure I can even set the password in this file, it is encrypted. No action."
+}
+
+function delugeweb__set_port() {
+  port="$1"
+  port=$(echo "$port" | sed 's/\//\\\//g')
+
+  delugeweb__stop
+  sed -i 's/^  "port":.*/  "port": $port,/'  $delugewebConfig
+}
+
+function delugeweb__set_defaultDaemon() {
+  defaultDaemon="$1"
+  defaultDaemon=$(echo "$defaultDaemonHost:$defaultDaemonPort" | sed 's/\//\\\//g')
+
+  delugeweb__stop
+  sed -i 's/^  "default_daemon":.*/  "default_daemon": "$defaultDaemon",/' $delugewebConfig
+}
+
+function delugeweb__set_urlbase() {
+  urlbase="delugeweb"
+  urlbase=$(echo "$urlbase" | sed 's/\//\\\//g')
+
+  delugeweb__stop
+  if grep -A 1 "<UrlBase>$" $delugewebConfig | grep -q "</UrlBase>$"; then
+#    sed -i '/<\/UrlBase>$/d' $delugewebConfig
+#    sed -i 's/<UrlBase>$/<UrlBase><\/UrlBase>/' $delugewebConfig
+  echo "fix deluge set url base!!!" 
+ fi
+  
+#  sed -i 's#\(<UrlBase>\).*\(</UrlBase>\)#\1'$urlbase'\2#g' $delugewebConfig
+  echo "fix deluge url base!!!"
+  
+}
+
+function delugeweb__set_delugeweb_enabled() {
+	if [[ -z $(delugeweb__get_delugeweb_settings) ]]; then
+		# Build "Settings" for a new deluge record
+		settings="
+		\"host\": \"localhost\",
+		\"port\": 8112,
+		\"password\"; \"admin\",		
+		\"defaultDaemonHost\": \"localhost\",
+		\"defaultDaemonPort\"; \"58846\",
+		\"useSsl\": false"
+      
+    # Clean up formatting
+	  settings=$(echo "$settings" | sed '/^$/d' | sed -e 's/^[ \t]*/  /')
+	  settings=$(echo -e "{\n$settings\n}")
+	  
+	  # Add/Insert the new deluge record
+	  delugeweb__stop
+		sqlite3 $delugewebDB "INSERT INTO DownloadClients VALUES(?, 1,'deluge','deluge','$settings','delugeSettings',1)"
+	else
+	  # Enable the existing deluge record
+	  delugeweb__stop
+	  sqlite3 $delugewebDB "UPDATE DownloadClients SET Enable='1' Implementation='deluge'"
+	fi
+}
+
+function delugeweb__set_delugeweb_settings() {
+
+	port="$1"	
+	password="$2"
+	host="$3"
+	defaultDaemonHost="$4"
+	defaultDaemonPort="$5"
+	
+	port=$(echo "$port" | sed 's/\//\\\//g')
+	password=$(echo "$password" | sed 's/\//\\\//g')
+	host=$(echo "$host" | sed 's/\//\\\//g')
+	defaultDaemon=$(echo "$defaultDeamonHost:$defaultDaemonPort" | sed 's/\//\\\//g')
+	
+  # Get the existing deluge record "Settings"
+	settings=$(delugeweb__get_delugeweb_settings)
+	
+	# Modify the existing deluge record "Settings"
+	settings=$(echo "$settings" | sed 's/  "port": .*,$/  "port": '$port',/')
+        settings=$(echo "$settings" | sed 's/  "password": ".*",$/  "password": "'$password'",/')
+	settings=$(echo "$settings" | sed 's/  "host": ".*",$/  "host": "'$host'",/')
+	settings=$(echo "$settings" | sed 's/  "defaultDaemon": .*,$/  "defaultDaemon": '$',/')
+  
+  # Update the existing deluge record w/ the modified "Settings"
+  delugeweb__stop
+  sqlite3 $delugewebDB "UPDATE DownloadClients SET Settings='$settings' WHERE Implementation='deluge'"
+}
+
+
+
+# Enable, Disable & Configure Supporting Apps
+# ---------------------------------------------------------------------------------------
+
+# deluge Section
+# ---------------------------
+
+function delugeweb__config_deluge() {
+	port="$1"	
+	password="$2"	
+	host="localhost"
+	category="delugeweb"
+	defaultDaemonHost="$3"
+	defaultDaemonPort="$4"
+	
+	echo "* Updating delugeweb's deluge+ Support"
+	delugeweb__set_delugeweb_enabled
+	delugeweb__set_delugeweb_settings "$port" "$apikey" "$username" "$password" "$host" "$category"
+}
+
+# Plex Media Server Section
+# ---------------------------
+
+function delugeweb__config_plexserver() {
+  port="32400"
+  host="localhost"
+  
+  echo "* Updating delugeweb's Plex Media Support"
+	delugeweb__set_plexserver_enabled
+	delugeweb__set_plexserver_settings "$port" "$host"
+}
+
+# Reverse Proxy Section
+# ---------------------------
+
+function delugeweb__config_proxy() {
+  urlbase="/deluge"
+  
+  echo "* Updating delugeweb's Reverse Proxy Support"
+  delugeweb__set_urlbase "$urlbase"
+}
+
+
+# Install, Configure & Upgrade
+# ---------------------------------------------------------------------------------------
+
+function delugeweb__install() {
+  echo "* Installing delugeweb"
+  
+  # Install deluge-web
+  apt-get -q -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+    install deluge-web
+  
+  # Stop the app, apt-get install sometimes automatically enables and starts apps
+  delugeweb__stop
+  
+  # Copy/Replace the init file
+  tar xf $configBundle --strip-components 2 -C /etc/init/ config/init/deluge-web.conf
+
+  # Copy the config/data directory into appdata
+  if [ ! -d "$delugewebData" ]; then
+    sudo su -c -u $osUser \
+      "tar xf $appdataBundle --strip-components 1 -C $tretflixPath/appdata/ appdata/delugeweb"
+  fi
+
+  # Symlink the upstart job
+    sudo ln -s /lib/init/upstart-job /etc/init.d/deluge-web
+  
+}
+
+function delugeweb__upgrade() {  
+  echo "* Upgrading delugeweb"
+  
+  delugeweb__stop
+  apt-get -q -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+    install deluge-web
+}
+
+function delugeweb__version_check() {
+  output=$(apt-cache policy delugeweb 2>&1)
+  installedVers=$(echo "$output" | grep "Installed:" | awk '{ print $2 }')
+  candidateVers=$(echo "$output" | grep "Candidate:" | awk '{ print $2 }')
+
+  if [ "$installedVers" == "$candidateVers" ]; then
+    echo "delugeweb is up-to-date"
+    false
+  else
+    true
+  fi
+}
+
+
+# Misc, Extras
+# ---------------------------------------------------------------------------------------
+
+function delugeweb__fixit() {
+  echo "Coming Soon..." > /dev/null
+}

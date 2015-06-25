@@ -1,0 +1,338 @@
+# avoid double inclusion
+if test "${sickrage__imported+defined}" == "defined"; then
+  return 0
+fi
+sickrage__imported=1
+
+
+# Service Status & App Config Output
+# ---------------------------------------------------------------------------------------
+
+function sickrage__get_status() {
+  if service sickrage status 2>&1 | grep -q "unrecognized service"; then
+    status="Not Installed"
+  elif service sickrage status > /dev/null 2>&1; then
+    if ls /etc/rc?.d/*sickrage > /dev/null 2>&1; then
+      status="Enabled|Running"
+    else
+      status="Disabled|Running"
+    fi
+  elif ls /etc/rc?.d/*sickrage > /dev/null 2>&1; then
+    status="Enabled|Stopped"
+  else
+    status="Disabled|Stopped"
+  fi
+  echo "$status"
+}
+
+function sickrage__show_config() {
+  status=$(sickrage__get_status)
+
+  echo "Sick Rage Config:"
+  echo "----------------------------"
+  echo "Status: $status"
+  if [ "$status" == "Enabled|Running" ]; then
+		username=$(sickrage__get_username)
+		password=$(sickrage__get_password)
+		port=$(sickrage__get_port)
+		apikey=$(sickrage__get_apikey)
+		ipv4=$(tools__get_ip)
+	
+		if echo "$(proxy__get_status)" | egrep -q "^Enabled|Running$"; then
+			url="http://$ipv4/sickrage"
+		else
+			url="http://$ipv4:$port/"
+		fi
+		
+    echo "Web UI: $url"
+    echo
+    echo "Username: $username"
+    echo "Password: $password"
+    echo "API Key: $apikey"
+  fi
+}
+
+
+# Service Controls
+# ---------------------------------------------------------------------------------------
+
+function sickrage__enable() {
+  if echo "$(sickrage__get_status)" | grep -q "^Disabled"; then
+    echo "* Enabling Sick Rage"
+    update-rc.d sickrage defaults
+  fi
+}
+
+function sickrage__disable() {
+  if echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+    echo "* Disabling Sick Rage"
+    sickrage__stop
+    update-rc.d -f sickrage remove
+  fi
+}
+
+function sickrage__start() {
+  if echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+    for i in {1..3}; do
+      if [ $i -gt 1 ]; then
+        sleep 2
+      fi
+      if [ "$(sickrage__get_status)" != "Enabled|Running" ]; then
+        service sickrage start
+      else
+        break
+      fi
+    done
+  fi
+}
+
+function sickrage__stop() {
+  for i in {1..3}; do
+    if [ $i -gt 1 ]; then
+      sleep 2
+    fi
+    if echo "$(sickrage__get_status)" | grep -q "Running$"; then
+      service sickrage stop
+    else
+      break
+    fi
+  done
+}
+
+
+# Get App Configuration
+# ---------------------------------------------------------------------------------------
+
+function sickrage__get_username() {
+  username=$(sed -n '/^\[General\]/,/^\[/p' $sickrageConfig | grep "^web_username " | awk '{ print $3 }')
+  
+  echo "$username"
+}
+
+function sickrage__get_password() {
+  password=$(sed -n '/^\[General\]/,/^\[/p' $sickrageConfig | grep "^web_password " | awk '{ print $3 }')
+  
+  echo "$password"
+}
+
+function sickrage__get_port() {
+  port=$(sed -n '/^\[General\]/,/^\[/p' $sickrageConfig | grep "^web_port " | awk '{ print $3 }')
+  
+  echo "$port"
+}
+
+function sickrage__get_apikey() {
+  apikey=$(sed -n '/^\[General\]/,/^\[/p' $sickrageConfig | grep "^api_key " | awk '{ print $3 }')
+  
+  echo "$apikey"
+}
+
+
+# Set App Configuration
+# ---------------------------------------------------------------------------------------
+
+function sickrage__set_username() {
+  username="$1"
+  username=$(echo "$username" | sed 's/\//\\\//g')
+  
+  sickrage__stop
+  sed -i -e '/^\[General\]/,/^\[/{/^\[General\]/n;/^\[/!{s/^web_username .*/web_username = '$username'/g}}' $sickrageConfig
+  sed -i -e '/^\[sickrage\]/,/^\[/{/^\[sickrage\]/n;/^\[/!{s/^username.*/username='$username'/g}}' $sickrageScriptConfig
+}
+
+function sickrage__set_password() {
+  password="$1"
+  password=$(echo "$password" | sed 's/\//\\\//g')
+
+  sickrage__stop
+  sed -i -e '/^\[General\]/,/^\[/{/^\[General\]/n;/^\[/!{s/^web_password .*/web_password = '$password'/g}}' $sickrageConfig
+  sed -i -e '/^\[sickrage\]/,/^\[/{/^\[sickrage\]/n;/^\[/!{s/^password.*/password='$password'/g}}' $sickrageScriptConfig
+}
+
+function sickrage__set_port() {
+  port="$1"
+  port=$(echo "$port" | sed 's/\//\\\//g')
+
+  sickrage__stop
+  sed -i -e '/^\[General\]/,/^\[/{/^\[General\]/n;/^\[/!{s/^web_port .*/web_port = '$port'/g}}' $sickrageConfig
+  sed -i -e '/^\[sickrage\]/,/^\[/{/^\[sickrage\]/n;/^\[/!{s/^port.*/port='$port'/g}}' $sickrageScriptConfig
+}
+
+function sickrage__set_apikey() {
+  apikey="$1"
+  apikey=$(echo "$apikey" | sed 's/\//\\\//g')
+
+  sickrage__stop
+  sed -i -e '/^\[General\]/,/^\[/{/^\[General\]/n;/^\[/!{s/^api_key .*/api_key = '$apikey'/g}}' $sickrageConfig
+}
+
+function sickrage__set_urlbase() {
+  urlbase="$1"
+  urlbase=$(echo "$urlbase" | sed 's/\//\\\//g')
+
+  sickrage__stop  
+  sed -i -e '/^\[General\]/,/^\[/{/^\[General\]/n;/^\[/!{s/^web_root .*/web_root = '$urlbase'/g}}' $sickrageConfig
+  sed -i -e '/^\[sickrage\]/,/^\[/{/^\[sickrage\]/n;/^\[/!{s/^web_root.*/web_root='$urlbase'/g}}' $sickrageScriptConfig
+}
+
+function sickrage__set_sabnzbd_enabled() {
+  enabled="sabnzbd"
+
+  sickrage__stop  
+  sed -i -e '/^\[General\]/,/^\[/{/^\[General\]/n;/^\[/!{s/^nzb_method .*/nzb_method = '$enabled'/g}}' $sickrageConfig
+}
+
+function sickrage__set_sabnzbd_username() {
+  username="$1"
+  username=$(echo "$username" | sed 's/\//\\\//g')
+
+  sickrage__stop  
+  sed -i -e '/^\[SABnzbd\]/,/^\[/{/^\[SABnzbd\]/n;/^\[/!{s/^sab_username .*/sab_username = '$username'/g}}' $sickrageConfig
+}
+
+function sickrage__set_sabnzbd_password() {
+  password="$1"
+  password=$(echo "$password" | sed 's/\//\\\//g')
+
+  sickrage__stop 
+  sed -i -e '/^\[SABnzbd\]/,/^\[/{/^\[SABnzbd\]/n;/^\[/!{s/^sab_password .*/sab_password = '$password'/g}}' $sickrageConfig
+}
+
+function sickrage__set_sabnzbd_host() {
+  host="$1"
+  host=$(echo "$host" | sed 's/\//\\\//g')
+
+  sickrage__stop
+  sed -i -e '/^\[SABnzbd\]/,/^\[/{/^\[SABnzbd\]/n;/^\[/!{s/^sab_host .*/sab_host = '$host'/g}}' $sickrageConfig
+}
+
+function sickrage__set_sabnzbd_apikey() {
+  apikey="$1"
+  apikey=$(echo "$apikey" | sed 's/\//\\\//g')
+
+  sickrage__stop  
+  sed -i -e '/^\[SABnzbd\]/,/^\[/{/^\[SABnzbd\]/n;/^\[/!{s/^sab_apikey .*/sab_apikey = '$apikey'/g}}' $sickrageConfig
+}
+
+function sickrage__set_sabnzbd_category() {
+  category="$1"
+  category=$(echo "$category" | sed 's/\//\\\//g')
+
+  sickrage__stop
+  sed -i -e '/^\[SABnzbd\]/,/^\[/{/^\[SABnzbd\]/n;/^\[/!{s/^sab_category .*/sab_category = '$category'/g}}' $sickrageConfig
+}
+
+function sickrage__set_plexserver_enabled() {
+  enabled="1"
+
+  sickrage__stop  
+  sed -i -e '/^\[Plex\]/,/^\[/{/^\[Plex\]/n;/^\[/!{s/^use_plex .*/use_plex = '$enabled'/g}}' $sickrageConfig
+  sed -i -e '/^\[Plex\]/,/^\[/{/^\[Plex\]/n;/^\[/!{s/^plex_update_library .*/plex_update_library = '$enabled'/g}}' $sickrageConfig
+}
+
+function sickrage__set_plexserver_host() {
+  host="$1"
+  host=$(echo "$host" | sed 's/\//\\\//g')
+
+  sickrage__stop  
+  sed -i -e '/^\[Plex\]/,/^\[/{/^\[Plex\]/n;/^\[/!{s/^plex_server_host .*/plex_server_host = '$host'/g}}' $sickrageConfig
+}
+
+
+# Enable, Disable & Configure Supporting Apps
+# ---------------------------------------------------------------------------------------
+
+# SABnzbd Section
+# ---------------------------
+
+function sickrage__config_sabnzbd() {
+	port="$1"
+	apikey="$2"
+	username="$3"
+	password="$4"
+	host="localhost"
+	category="sickrage"
+	
+	echo "* Updating Sick Rage's SABnzbd+ Support"
+	sickrage__set_sabnzbd_enabled
+	sickrage__set_sabnzbd_username "$username"
+	sickrage__set_sabnzbd_password "$password"
+	sickrage__set_sabnzbd_host "http://$host:$port/"
+	sickrage__set_sabnzbd_apikey "$apikey"
+	sickrage__set_sabnzbd_category "$category"
+}
+
+# Plex Media Server Section
+# ---------------------------
+
+function sickrage__config_plexserver() {
+  port="32400"
+  host="localhost"
+  
+  echo "* Updating Sick Rage's Plex Media Server Support"
+  sickrage__set_plexserver_enabled
+  sickrage__set_plexserver_host "$host:$port"
+}
+
+# Reverse Proxy Section
+# ---------------------------
+
+function sickrage__config_proxy() {
+  urlbase="/sickrage"
+  
+  echo "* Updating Sick Rage's Reverse Proxy Support"
+  sickrage__set_urlbase "$urlbase"
+}
+
+
+# Install, Configure & Upgrade
+# ---------------------------------------------------------------------------------------
+
+function sickrage__install() {
+  echo "* Installing Sick Rage"
+  
+  # Git Clone From the Remote Repository
+  git clone https://github.com/SiCKRAGETV/SickRage.git $sickrageSource
+  
+  # Fix Permissions
+  chown -R $osUser:$osUser $sickrageSource
+  
+  # Copy/Replace the init file
+  tar xf $configBundle --strip-components 2 -C /etc/init.d/ config/init.d/sickrage
+  
+  # Copy/Replace the default config file
+  tar xf $configBundle --strip-components 2 -C /etc/default/ config/default/sickrage 
+  
+  # Copy the config/data directory into appdata
+  if [ ! -d "$sickrageData" ]; then
+    sudo su -c -u $osUser \
+      "tar xf $appdataBundle --strip-components 1 -C $tretflixPath/appdata/ appdata/sickrage"
+  fi
+}
+
+function sickrage__upgrade() {
+  echo "* Upgrading Sick Rage"
+  
+  sickrage__stop
+  sudo su -c -u $osUser \
+    "cd $sickrageSource && git remote update"
+  sudo su -c -u $osUser \
+    "cd $sickrageSource && git pull --all"
+}
+
+function sickrage__version_check() {
+  if cd $sickrageSource && ! git fetch -v --dry-run 2>&1 | grep -iv "^from" | grep -ivq "\[up to date\]"; then
+    echo "Sick Rage is up-to-date"
+    false
+  else
+    true
+  fi
+}
+
+
+# Misc, Extras
+# ---------------------------------------------------------------------------------------
+
+function sickrage__fixit() {
+  echo "Coming Soon..."
+}
