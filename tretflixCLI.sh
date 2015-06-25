@@ -106,10 +106,13 @@ import "modules/scheduler"
 import "modules/services"
 import "modules/shares"
 import "modules/sickbeard"
+import "modules/sickrage"
 import "modules/storage"
 import "modules/tools"
 import "modules/transmission"
+import "modules/delugeweb"
 import "modules/update"
+#import "modules/dockerDeluge"
 import "modules/proxy"
 
 
