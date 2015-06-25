@@ -296,10 +296,11 @@ function config__wizard() {
 
 	echo
 	while true; do
-		read -p "Do you want to use Sick Beard? (y/n): " input
+		read -p "Do you want to use Sick Beard (b), Sick Rage (r), or None (n)? (b/r/n): " input
 		case "$input" in
-			[yY] | [yY][Ee][Ss] )
+			[bB] | [sS][iI][cC][kK][bB][eE][aA][rR][dD] )
 				sickbeardAction="Enable"
+				sickrageAction="Disable"
 				read -p "Enter a username for the Sick Beard Web UI [Default: admin]: " input
 				if [[ -z "${input}" ]]; then
 					sickbeardUser="admin"
@@ -321,7 +322,33 @@ function config__wizard() {
 				sickbeardAPIkey="$(tools__gen_apikey)"
 				echo "New Sick Beard API key randomly generated for increased security."
 				break;;
-			[nN] | [n|N][O|o] )
+
+			 [rR] | [sS][iI][cC][kK][rR][aA][gG][eE] )
+                                sickrageAction="Enable"
+				sickbeardAction="Disable"
+                                read -p "Enter a username for the Sick Rage Web UI [Default: admin]: " input
+                                if [[ -z "${input}" ]]; then
+                                        sickrageUser="admin"
+                                else
+                                        sickrageUser="$input"
+                                fi
+                                read -p "Enter a password for the Sick Rage Web UI [Default: admin]: " input
+                                if [[ -z "${input}" ]]; then
+                                        sickragePass="admin"
+                                else
+                                        sickragePass="$input"
+                                fi
+                                read -p "Enter a port number for the Sick Rage Web UI [Default: 8082]: " input
+                                if [[ -z "${input}" ]]; then
+                                        sickragePort="8082"
+                                else
+                                        sickragePort="$input"
+                                fi
+                                sickrageAPIkey="$(tools__gen_apikey)"
+                                echo "New Sick Rage API key randomly generated for increased security."
+                                break;;
+			[nN] | [nN][Oo] | [nN][oO][nN][eE] )
+				sickrageAction="Disable"
 				sickbeardAction="Disable"
 				break;;
 			* )
@@ -363,6 +390,73 @@ function config__wizard() {
 				echo
 		esac      
 	done
+        while true; do
+                read -p "Do you want to use Deluge-Web? (y/n): " input
+                case "$input" in
+                        [yY] | [yY][Ee][Ss] )
+                                delugewebAction="Enable"
+                                delugewebUser="admin"
+                                read -p "Enter a password for the delugeweb Web UI [Default: admin]: " input
+                                if [[ -z "${input}" ]]; then
+                                        delugewebPass="admin"
+                                else
+                                        delugewebPass="$input"
+                                fi
+                                read -p "Enter a port number for the delugeweb Web UI [Default: 8112]: " input
+                                if [[ -z "${input}" ]]; then
+                                        delugewebPort="8112"
+                                else
+                                        delugewebPort="$input"
+                                fi
+				read -p "Enter the default deluge-web daemon_ip:port  [Default: Use the built in DockerDeluge configuration]: " input
+                                if [[ -z "${input}" ]]; then
+                                        delugewebDaemon="dockerdeluge"
+                                else
+                                        delugewebDaemon="$input"
+                                fi
+                                break;;
+                        [nN] | [n|N][O|o] )
+                                delugewebAction="Disable"
+                                break;;
+                        * )
+                                echo "!! ERROR: Invalid entry."
+                                echo
+                esac
+        done
+	 while true; do
+                read -p "Do you want to use Docker Container (Deluge Daemon + PIA VPN) [64bit systems only!]? (y/n): " input
+                case "$input" in
+                        [yY] | [yY][Ee][Ss] )
+                                dockerdelugeAction="Enable"
+                                read -p "Enter the Private Internet Access (PIA) service VPN account username: " input
+                                if [[ -z "${input}" ]]; then
+					echo "!! ERROR: Invalid entry."
+                                        dockerdelugeUser="SetUserNameHERE"
+                                else
+                                        dockerdelugeUser="$input"
+                                fi
+                                read -p "Enter the Private Internet Access (PIA) service VPN account  password: " input
+                                if [[ -z "${input}" ]]; then
+                                        dockerdelugePass="admin"
+                                else
+                                        dockerdelugePass="$input"
+                                fi
+                                read -p "Enter a port number for the dockerdeluge Deluge Daemon [Default: 58846]: " input
+                                if [[ -z "${input}" ]]; then
+                                        dockerdelugePort="58846"
+                                else
+                                        dockerdelugePort="$input"
+				fi
+                                break;;
+                        [nN] | [n|N][O|o] )
+                                dockerdelugeAction="Disable"
+                                break;;
+                        * )
+                                echo "!! ERROR: Invalid entry."
+                                echo
+                esac
+        done
+
 	
 	echo
 	while true; do
@@ -607,6 +701,9 @@ function config__wizard() {
     if [ "$sickbeardAction" == "Enable" ]; then
       sabnzbd__config_sickbeard
     fi
+    if [ "$sickrageAction" == "Enable" ]; then
+      sabnzbd__config_sickrage
+    fi
 
 		# Start the app
 		sabnzbd__start
@@ -662,6 +759,87 @@ function config__wizard() {
 		fi
 	fi
 	
+
+	# Sick Rage Section
+	if [ "$sickrageAction" == "Enable" ]; then
+
+		# Install the app
+		if [ "$(sickrage__get_status)" == "Not Installed" ]; then
+			sickrage__install
+			
+		# Upgrade the app
+		elif sickrage__version_check; then	
+			sickrage__upgrade
+		fi
+			
+		if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+			# Enable the app
+			sickrage__enable
+		fi
+		
+		# Configure the app using user input
+		echo "* Configuring Sick Rage"
+		sickrage__set_username "$sickrageUser"
+		sickrage__set_password "$sickragePass"
+		sickrage__set_port "$sickragePort"
+		sickrage__set_apikey "$sickrageAPIkey"
+		
+
+    if [ "$sabnzbdAction" == "Enable" ]; then
+      sickrage__config_sabnzbd "$sabnzbdPort" "$sabnzbdAPIkey" "$sabnzbdUser" "$sabnzbdPass"
+    fi
+    if [ "$plexserverAction" == "Enable" ]; then
+      sickrage__config_plexserver
+    fi
+    if [ "$proxyAction" == "Enable" ]; then
+      sickrage__config_proxy
+    fi
+
+		# Start the app
+		sickrage__start
+	else
+		# Stop and disable the app if not already disabled
+		if echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+			sickrage__disable
+		fi
+	fi
+
+	# Deluge-Web Section
+	if [ "$delugewebAction" == "Enable" ]; then
+
+		# Install the app
+		if [ "$(delugeweb__get_status)" == "Not Installed" ]; then
+			delugeweb__install
+			
+		# Upgrade the app
+		elif delugeweb__version_check; then	
+			delugeweb__upgrade
+		fi
+			
+		if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+			# Enable the app
+			delugeweb__enable
+		fi
+		
+		# Configure the app using user input
+		echo "* Configuring Sick Beard"
+		delugeweb__set_password "$delugewebPass"
+		delugeweb__set_port "$delugewebPort"
+		delugeweb__set_defalutDaemon "$delugewebDaemon"
+		
+
+    if [ "$proxyAction" == "Enable" ]; then
+      delugeweb__config_proxy
+    fi
+
+		# Start the app
+		delugeweb__start
+	else
+		# Stop and disable the app if not already disabled
+		if echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+			delugeweb__disable
+		fi
+	fi
 	
 	# Transmission Section
 	if [ "$transmissionAction" == "Enable" ]; then
@@ -696,6 +874,38 @@ function config__wizard() {
 	fi
 
 
+	 # DockerDeluge PIA VPN Section
+        if [ "$dockerdelugeAction" == "Enable" ]; then
+
+                # Install the app
+                if [ "$(dockerdeluge__get_status)" == "Not Installed" ]; then
+                        dockerdeluge__install
+
+                # Upgrade the app
+                elif dockerdeluge__version_check; then
+                        dockerdeluge__upgrade
+                fi
+
+                if ! echo "$(dockerdeluge__get_status)" | grep -q "^Enabled"; then
+                        # Enable the app
+                        dockerdeluge__enable
+                fi
+
+                # Configure the app using user input
+                echo "* Configuring Docker Container (Deluge+PIA+VPN)"
+                dockerdeluge__set_username "$dockerdelugeUser"
+                dockerdeluge__set_password "$dockerdelugePass"
+                dockerdeluge__set_port "$dockerdelugePort"
+
+                # Start the app
+                dockerdeluge__start
+        else
+                # Stop and disable the app if not already disabled
+                if echo "$(dockerdeluge__get_status)" | grep -q "^Enabled"; then
+                        dockerdeluge__disable
+                fi
+        fi
+
   # Reverse Proxy Section
 	if [ "$proxyAction" == "Enable" ]; then
 		if ! echo "$(proxy__get_status)" | grep -q "^Enabled"; then
@@ -725,6 +935,12 @@ function config__wizard() {
     fi
     if [ "$sickbeardAction" == "Enable" ]; then
       proxy__config_sickbeard "$sickbeardPort"
+    fi
+    if [ "$sickrageAction" == "Enable" ]; then
+      proxy__config_sickrage "$sickragePort"
+    fi
+    if [ "$delugewebAction" == "Enable" ]; then
+      proxy__config_delugeweb "$delugewebPort"
     fi
     if [ "$transmissionAction" == "Enable" ]; then
       proxy__config_transmission "$transmissionPort"
@@ -777,6 +993,8 @@ function config__backup_appdata() {
   plexserver__start
   sabnzbd__stop
   sickbeard__stop
+  sickrage__stop
+  delugeweb__stop
   transmission__stop
 	
 	echo "* Creating Backup Archive"
@@ -792,6 +1010,8 @@ function config__backup_appdata() {
   plexserver__start
   sabnzbd__start
   sickbeard__start
+  sickrage__start
+  delugeweb__start
   transmission__start
 	
 	echo
@@ -822,10 +1042,13 @@ function config__restore_appdata() {
   plexserver__stop
   sabnzbd__stop
   sickbeard__stop
+  sickrage__stop
+  delugeweb__stop
   transmission__stop
+  dockerdeluge__stop
   
 	
-	echo "* Creating Backup Archive"
+	echo "* Restoring from Backup Archive"
 	
 	timestamp=$(date "+%Y%m%d%H%M%S")
 	sudo su -c -u $osUser \
@@ -953,6 +1176,66 @@ function config__restore_appdata() {
 	  sickbeardAction="None"
 	fi
 	
+	 if tar -tf "$file" | grep -q "^appdata/sickrage/$"; then
+                while true; do
+                        read -p "Do you want to restore Sick Rage? (y/n): " input
+                        case "$input" in
+                                [yY] | [yY][Ee][Ss] )
+                                        sickrageAction="Restore"
+                                        break;;
+                                [nN] | [n|N][O|o] )
+                                        sickrageAction="None"
+                                        break;;
+                                * )
+                                        echo "!! ERROR: Invalid entry."
+                                        echo
+                        esac
+                done
+        else
+          sickrageAction="None"
+        fi
+
+
+        if tar -tf "$file" | grep -q "^appdata/delugeweb/$"; then
+                while true; do
+                        read -p "Do you want to restore Sick Rage? (y/n): " input
+                        case "$input" in
+                                [yY] | [yY][Ee][Ss] )
+                                        delugewebAction="Restore"
+                                        break;;
+                                [nN] | [n|N][O|o] )
+                                        delugewebAction="None"
+                                        break;;
+                                * )
+                                        echo "!! ERROR: Invalid entry."
+                                        echo
+                        esac
+                done
+        else
+          delugewebAction="None"
+        fi
+
+        if tar -tf "$file" | grep -q "^appdata/dockerdeluge/$"; then
+                while true; do
+                        read -p "Do you want to restore Sick Rage? (y/n): " input
+                        case "$input" in
+                                [yY] | [yY][Ee][Ss] )
+                                        dockerdelugeAction="Restore"
+                                        break;;
+                                [nN] | [n|N][O|o] )
+                                        dockerdelugeAction="None"
+                                        break;;
+                                * )
+                                        echo "!! ERROR: Invalid entry."
+                                        echo
+                        esac
+                done
+        else
+          dockerdelugeAction="None"
+        fi
+
+
+
 	if tar -tf "$file" | grep -q "^appdata/transmission-daemon/$"; then
 		while true; do
 			read -p "Do you want to restore Transmission? (y/n): " input
@@ -1111,7 +1394,55 @@ function config__restore_appdata() {
 		# Flag to sync current config w/ the apps being restored
 	  sickbeardAction="Enable"
 	fi
+
+        if [ "$sickrageAction" == "Restore" ]; then
+                # Stop the service
+                sickrage__stop
+
+                # Restore Sick Beard appdata from backup
+                echo "* Restoring Sick Beard Data"
+                rm -rf "$sickrageData"
+                sudo su -c -u $osUser \
+                        "tar xvf $file --strip-components 1 -C $tretflixPath/appdata/ appdata/sickrage"
+
+                sickrageAction="Enable"
+        elif echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+                # Flag to sync current config w/ the apps being restored
+          sickrageAction="Enable"
+        fi
 	
+	if [ "$delugewebAction" == "Restore" ]; then
+                # Stop the service
+                delugeweb__stop
+
+                # Restore Sick Beard appdata from backup
+                echo "* Restoring Sick Beard Data"
+                rm -rf "$delugewebData"
+                sudo su -c -u $osUser \
+                        "tar xvf $file --strip-components 1 -C $tretflixPath/appdata/ appdata/delugeweb"
+
+                delugewebAction="Enable"
+        elif echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+                # Flag to sync current config w/ the apps being restored
+          delugewebAction="Enable"
+        fi
+
+ 	if [ "$dockerdelugeAction" == "Restore" ]; then
+                # Stop the service
+                dockerdeluge__stop
+
+                # Restore Sick Beard appdata from backup
+                echo "* Restoring Sick Beard Data"
+                rm -rf "$dockerdelugeData"
+                sudo su -c -u $osUser \
+                        "tar xvf $file --strip-components 1 -C $tretflixPath/appdata/ appdata/dockerdeluge"
+
+                dockerdelugeAction="Enable"
+        elif echo "$(dockerdeluge__get_status)" | grep -q "^Enabled"; then
+                # Flag to sync current config w/ the apps being restored
+          dockerdelugeAction="Enable"
+        fi
+
 	if [ "$transmissionAction" == "Restore" ]; then
 		# Stop the service
 		transmission__stop
@@ -1279,6 +1610,9 @@ function config__restore_appdata() {
     if [ "$sickbeardAction" == "Enable" ]; then
       sabnzbd__config_sickbeard
     fi
+    if [ "$sickrageAction" == "Enable" ]; then
+      sabnzbd__config_sickrage
+    fi
 
 		# Start the app
 		sabnzbd__start
@@ -1319,7 +1653,64 @@ function config__restore_appdata() {
 		# Start the app
 		sickbeard__start
 	fi
-	
+
+	# Sick Rage Section
+        if [ "$sickrageAction" == "Enable" ]; then
+
+                # Install the app
+                if [ "$(sickrage__get_status)" == "Not Installed" ]; then
+                        sickrage__install
+
+                # Upgrade the app
+                elif sickrage__version_check; then
+                        sickrage__upgrade
+                fi
+
+                if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+                        # Enable the app
+                        sickrage__enable
+                fi
+
+    if [ "$sabnzbdAction" == "Enable" ]; then
+                        sabnzbdPort=$(sabnzbd__get_port)
+                        sabnzbdAPIkey=$(sabnzbd__get_apikey)
+                        sabnzbdUser=$(sabnzbd__get_username)
+                        sabnzbdPass=$(sabnzbd__get_password)
+      sickrage__config_sabnzbd "$sabnzbdPort" "$sabnzbdAPIkey" "$sabnzbdUser" "$sabnzbdPass"
+    fi
+
+
+    if [ "$plexserverAction" == "Enable" ]; then
+      sickrage__config_plexserver
+    fi
+    if [ "$proxyAction" == "Enable" ]; then
+      sickrage__config_proxy
+    fi
+
+                # Start the app
+                sickrage__start
+        fi
+
+         # Delue-Web Section
+        if [ "$delugewebAction" == "Enable" ]; then
+
+                # Install the app
+                if [ "$(delugeweb__get_status)" == "Not Installed" ]; then
+                        delugeweb__install
+
+                # Upgrade the app
+                elif delugeweb__version_check; then
+                        delugeweb__upgrade
+                fi
+
+                if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+                        # Enable the app
+                        delugeweb__enable
+                fi
+
+                # Start the app
+                delugeweb__start
+        fi	
 	
 	# Transmission Section
 	if [ "$transmissionAction" == "Enable" ]; then
@@ -1341,6 +1732,27 @@ function config__restore_appdata() {
 		# Start the app
 		transmission__start
 	fi
+
+	 # Docker Container (Deluge+PIA+VPN) Section
+        if [ "$dockerdelugeAction" == "Enable" ]; then
+
+                # Install the app
+                if [ "$(dockerdeluge__get_status)" == "Not Installed" ]; then
+                        dockerdeluge__install
+
+                # Upgrade the app
+                elif dockerdeluge__version_check; then
+                        dockerdeluge__upgrade
+                fi
+
+                if ! echo "$(dockerdeluge__get_status)" | grep -q "^Enabled"; then
+                        # Enable the app
+                        dockerdeluge__enable
+                fi
+
+                # Start the app
+                dockerdeluge__start
+        fi
 
 	
   # Reverse Proxy Section
@@ -1374,6 +1786,14 @@ function config__restore_appdata() {
     if [ "$sickbeardAction" == "Enable" ]; then
       sickbeardPort=$(sickbeard__get_port)
       proxy__config_sickbeard "$sickbeardPort"
+    fi
+    if [ "$sickrageAction" == "Enable" ]; then
+      sickragePort=$(sickrage__get_port)
+      proxy__config_sickrage "$sickragePort"
+    fi
+    if [ "$delugewebAction" == "Enable" ]; then
+      delugewebPort=$(delugeweb__get_port)
+      proxy__config_delugeweb "$delugewebPort"
     fi
     if [ "$transmissionAction" == "Enable" ]; then
       transmissionPort=$(transmission__get_port)

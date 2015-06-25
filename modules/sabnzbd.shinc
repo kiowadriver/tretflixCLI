@@ -228,6 +228,19 @@ function sabnzbd__set_sickbeard_category() {
 	fi
 }
 
+function sabnzbd__set_sickrage_category() {
+        if ! egrep -q "\[\[sickrage\]\]" $sabnzbdConfig; then
+          sabnzbd__stop
+                sed -i '/^\[categories\].*/a \
+                        [[sickrage]]\npriority = -100 pp = ""\nname = sickrage\nscript = sabToSickBeard.py\nnewzbin = ""\ndir = sickrage' $sabnzbdConfig
+        fi
+
+        if [ ! -d "/opt/tretflix/tmp/sabnzbdplus/sickrage" ]; then
+                sudo su -c -u $osUser \
+                        "mkdir -p /opt/tretflix/tmp/sabnzbdplus/sickrage"
+        fi
+}
+
 
 # Enable, Disable & Configure Supporting Apps
 # ---------------------------------------------------------------------------------------
@@ -264,6 +277,14 @@ function sabnzbd__config_sickbeard() {
 	sabnzbd__set_sickbeard_category
 }
 
+# Sick Rage Section
+# ---------------------------
+
+function sabnzbd__config_sickrage() {
+  echo "* Updating SABnzbd+'s Sick Rage Support"
+        sabnzbd__set_sickrage_category
+}
+
 
 # Install, Configure & Upgrade
 # ---------------------------------------------------------------------------------------
@@ -272,7 +293,7 @@ function sabnzbd__install() {
   echo "* Installing SABnzbd+"
   
   # Add the apt repository
-  if [ ! -f "/etc/apt/sources.list.d/jcfp-ppa-precise.list" ]; then
+  if [ ! -f "/etc/apt/sources.list.d/jcfp-ppa-trusty.list" ]; then
     add-apt-repository -y ppa:jcfp/ppa
     
     # Update apt repository package lists

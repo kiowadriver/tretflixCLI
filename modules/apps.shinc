@@ -25,7 +25,9 @@ function apps__help() {
   echo "  -p, --plexserver"
   echo "  -s, --sabnzbd"
   echo "  -b, --sickbeard"
+  echo "  -r, --sickrage"
   echo "  -t, --transmission"
+  echo "  -d, --delugeweb"
   echo
   echo "NOTES:" 
   echo "  The 'new apikey' command is only available for the apps that use"
@@ -160,12 +162,26 @@ function apps__enable() {
 			echo
 			sickbeard__show_config
 			;;
+		'-r' | '--sickrage')
+      apps__sickrage "enable"
+      
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;;
 		'-t' | '--transmission')		
       apps__transmission "enable"
       
 			# Display Config Output
 			echo
 			transmission__show_config
+			;;
+		'-d' | '--delugeweb')		
+      apps__delugeweb "enable"
+      
+			# Display Config Output
+			echo
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -224,13 +240,27 @@ function apps__disable() {
 			# Display Config Output
 			echo
 			sickbeard__show_config
-			;; 
+			;;
+		'-r' | '--sickrage')
+      apps__sickrage "disable"
+      
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;;			
 		'-t' | '--transmission')
       apps__transmission "disable"
       
 			# Display Config Output
 			echo
 			transmission__show_config
+			;;
+	 	'-d' | '--delugeweb')
+      apps__delugeweb "disable"
+      
+			# Display Config Output
+			echo
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -289,13 +319,27 @@ function apps__upgrade() {
 			# Display Config Output
 			echo
 			sickbeard__show_config
-			;;   
+			;;
+		'-r' | '--sickrage')
+      apps__sickrage "upgrade"
+
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;;			
 		'-t' | '--transmission')
       apps__transmission "upgrade"
 
 			# Display Config Output
 			echo
 			transmission__show_config
+			;;
+		'-d' | '--delugeweb')
+      apps__transmission "upgrade"
+
+			# Display Config Output
+			echo
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -355,13 +399,27 @@ function apps__set_username() {
 			# Display Config Output
 			echo
 			sickbeard__show_config
-			;;  
+			;; 
+		'-r' | '--sickbeard')
+	apps__sickrage "set username" "$username"
+      
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;;  			
 		'-t' | '--transmission')
       apps__transmission "set username" "$username"
       
 			# Display Config Output
 			echo
 			transmission__show_config
+			;;
+		'-d' | '--delugeweb')
+      apps__transmission "set username" "$username"
+      
+			# Display Config Output
+			echo
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -421,13 +479,27 @@ function apps__set_password() {
 			# Display Config Output
 			echo
 			sickbeard__show_config
-			;; 
+			;;
+		'-r' | '--sickrage')
+      apps__sickrage "set password" "$password"
+            
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;; 			
 		'-t' | '--transmission')
       apps__transmission "set password" "$password"
             
 			# Display Config Output
 			echo
 			transmission__show_config
+			;;
+		'-d' | '--delugeweb')
+      apps__delugeweb "set password" "$password"
+            
+			# Display Config Output
+			echo
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -486,6 +558,13 @@ function apps__set_port() {
 			echo
 			sickbeard__show_config
 			;; 
+		'-r' | '--sickrage')
+      apps__sickrage "set port" "$port"
+            
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;;
 		'-t' | '--transmission')
       apps__transmission "set port" "$port"
             
@@ -493,6 +572,13 @@ function apps__set_port() {
 			echo
 			transmission__show_config
 			;;
+		'-d' | '--delugeweb')
+      apps__delugeweb "set port" "$port"
+            
+			# Display Config Output
+			echo
+			delugeweb__show_config
+			;;	
 		*)
 			apps__help
 	esac
@@ -551,12 +637,26 @@ function apps__new_apikey() {
 			echo
 			sickbeard__show_config
 			;;  
+		'-r' | '--sickrage')
+      apps__sickrage "new apikey"
+            
+			# Display Config Output
+			echo
+			sickrage__show_config
+			;;	
 		'-t' | '--transmission')
       apps__transmission "new apikey"
             
 			# Display Config Output
 			echo
 			transmission__show_config
+			;;
+		'-d' | '--delugeweb')
+      apps__delugeweb "new apikey"
+            
+			# Display Config Output
+			echo
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -588,8 +688,14 @@ function apps__show_config() {
 		'-b' | '--sickbeard')
 			sickbeard__show_config
 			;;
+		'-r' | '--sickrage')
+			sickrage__show_config
+			;;
 		'-t' | '--transmission')
 			transmission__show_config
+			;;
+		'-d' | '--delugeweb')
+			delugeweb__show_config
 			;;
 		*)
 			apps__help
@@ -1448,6 +1554,134 @@ function apps__sickbeard() {
 	fi
 }
 
+function apps__sickrage() {
+  option="$1"
+  
+  if [ "$option" == "enable" ]; then
+  
+    # If the app is already enabled and running there's nothing to do
+    if [ "$(sickrage__get_status)" == "Enabled|Running" ]; then
+      echo "Sick Rage is already enabled"
+    
+    # If the app is already enabled but stopped, start the app
+    elif [ "$(sickrage__get_status)" == "Enabled|Stopped" ]; then
+		  # Start the app
+		  sickrage__start
+		  
+		# If the app is not enabled, Install (or Upgrade) the app as needed, update
+		# the config as necessary to support the other associated apps and start the app
+		elif ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+		
+		  # Install the app
+			if [ "$(sickrage__get_status)" == "Not Installed" ]; then
+				sickrage__install
+				
+			# Upgrade the app
+			elif sickrage__version_check; then	
+				sickrage__upgrade
+			fi
+			
+			# Enable the app
+			sickrage__enable
+			
+			# Update SABnzbd+ Support
+			if echo "$(sabnzbd__get_status)" | grep -q "^Enabled"; then
+			  sabnzbdPort=$(sabnzbd__get_port)
+			  sabnzbdAPIkey=$(sabnzbd__get_apikey)
+			  sabnzbdUser=$(sabnzbd__get_username)
+			  sabnzbdPass=$(sabnzbd__get_password)
+				sickrage__config_sabnzbd "$sabnzbdPort" "$sabnzbdAPIkey" "$sabnzbdUser" "$sabnzbdPass"
+				
+				sabnzbd__config_sickrage
+				sabnzbd__start
+			fi
+
+			# Enable Plex Server Support
+			if echo "$(plexserver__get_status)" | grep -q "^Enabled"; then
+				sickrage__config_plexserver
+			fi
+			
+			# Enable Reverse Proxy Support
+			if echo "$(proxy__get_status)" | grep -q "^Enabled"; then
+				sickrage__config_proxy
+				
+				sickragePort=$(sickrage__get_port)
+				proxy__config_sickrage "$sickragePort"
+				proxy__start
+			fi
+
+      # Start the app
+			sickrage__start
+		fi
+	
+	elif [ "$option" == "disable" ]; then
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Rage is already disabled"
+	  else
+		  sickrage__disable
+		fi
+		
+	elif [ "$option" == "upgrade" ]; then
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Rage is disabled"
+	  else
+			if sickrage__version_check; then
+				sickrage__upgrade
+				sickrage__start
+			fi
+		fi
+		
+	elif [ "$option" == "set username" ]; then
+	  username="$2"
+	  
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Rage is disabled"
+	  else
+			echo "* Configuring Sick Rage"
+			sickrage__set_username "$username"
+			sickrage__start
+		fi
+
+	elif [ "$option" == "set password" ]; then
+	  password="$2"
+
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Rage is disabled"
+	  else
+			echo "* Configuring Sick Rage"
+			sickrage__set_password "$password"
+			sickrage__start
+		fi
+		
+	elif [ "$option" == "set port" ]; then
+	  port="$2"
+
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Rage is disabled"
+	  else	  
+			echo "* Configuring Sick Rage"
+			sickrage__set_port "$port"
+			sickrage__start
+		
+			if echo "$(proxy__get_status)" | egrep -q "^Enabled"; then
+				proxy__config_sickrage "$port"
+				proxy__start
+			fi
+		fi
+		
+	elif [ "$option" == "new apikey" ]; then
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Rage is disabled"
+	  else
+			apikey="$(tools__gen_apikey)"
+		
+			echo "* Configuring Sick Rage"
+			sickrage__set_apikey "$apikey"
+			sickrage__start
+		fi
+	fi
+}
+
 function apps__transmission() {
   option="$1"
   
@@ -1556,6 +1790,115 @@ function apps__transmission() {
 	fi
 }
 
+function apps__delugeweb() {
+  option="$1"
+  
+  if [ "$option" == "enable" ]; then
+  
+    # If the app is already enabled and running there's nothing to do
+    if [ "$(delugeweb__get_status)" == "Enabled|Running" ]; then
+      echo "Deluge-Web is already enabled"
+    
+    # If the app is already enabled but stopped, start the app
+    elif [ "$(delugeweb__get_status)" == "Enabled|Stopped" ]; then
+		  # Start the app
+		  delugeweb__start
+		  
+		# If the app is not enabled, Install (or Upgrade) the app as needed, update
+		# the config as necessary to support the other associated apps and start the app
+		elif ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+			echo "* Updating apt repository package lists"
+			apt-get update
+			
+		  # Install the app
+			if [ "$(delugeweb__get_status)" == "Not Installed" ]; then
+				delugeweb__install
+				
+			# Upgrade the app
+			elif delugeweb__version_check; then	
+				delugeweb__upgrade
+			fi
+			
+			# Enable the app
+			delugeweb__enable
+			
+			# Enable Reverse Proxy Support
+			if echo "$(proxy__get_status)" | grep -q "^Enabled"; then
+				delugewebPort=$(delugeweb__get_port)
+				proxy__config_delugeweb "$delugewebPort"
+				proxy__start
+			fi
+
+      # Start the app
+			delugeweb__start
+		fi
+	
+	elif [ "$option" == "disable" ]; then
+	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+	    echo "Transmission is already disabled"
+	  else
+		  delugeweb__disable
+		fi
+		
+	elif [ "$option" == "upgrade" ]; then
+	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+	    echo "Transmission is disabled"
+	  else
+			echo "* Updating apt repository package lists"
+			apt-get update
+		
+			if delugeweb__version_check; then
+				delugeweb__upgrade
+				delugeweb__start
+			fi
+		fi
+		
+	elif [ "$option" == "set username" ]; then
+	  username="$2"
+	  
+	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+	    echo "Transmission is disabled"
+	  else
+			echo "* Configuring Transmission"
+			delugeweb__set_username "$username"
+			delugeweb__start
+		fi
+
+	elif [ "$option" == "set password" ]; then
+	  password="$2"
+	  
+	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+	    echo "Transmission is disabled"
+	  else
+			echo "* Configuring Transmission"
+			delugeweb__set_password "$password"
+			delugeweb__start
+		fi
+		
+	elif [ "$option" == "set port" ]; then
+	  port="$2"
+	  
+	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+	    echo "Transmission is disabled"
+	  else
+			echo "* Configuring Transmission"
+			delugeweb__set_port "$port"
+			delugeweb__start
+			
+			if echo "$(proxy__get_status)" | egrep -q "^Enabled"; then
+				proxy__config_delugeweb "$port"
+				proxy__start
+			fi
+		fi
+		
+	elif [ "$option" == "new apikey" ]; then
+	  echo "The 'new apikey' command is not available for Transmission"
+	  echo
+	  exit 1
+	fi
+}
+
+
 function apps__allapps() {
   option="$1"
   
@@ -1582,8 +1925,14 @@ function apps__allapps() {
 		if [ "$(sickbeard__get_status)" == "Not Installed" ]; then
 			sickbeard__install
 		fi
+		if [ "$(sickrage__get_status)" == "Not Installed" ]; then
+			sickrage__install
+		fi
 		if [ "$(transmission__get_status)" == "Not Installed" ]; then
 			transmission__install
+		fi
+		if [ "$(delugeweb__get_status)" == "Not Installed" ]; then
+			delugeweb__install
 		fi		
 		
 
@@ -1833,6 +2182,53 @@ function apps__allapps() {
       # Start the app
 			sickbeard__start
 		fi
+		
+		# Sick Rage Section
+		# ---------------------------
+		
+    # If the app is already enabled and running there's nothing to do
+    if [ "$(sickrage__get_status)" == "Enabled|Running" ]; then
+      echo "Sick Rage is already enabled"
+    
+    # If the app is already enabled but stopped, start the app
+    elif [ "$(sickrage__get_status)" == "Enabled|Stopped" ]; then
+		  # Start the app
+		  sickrage__start
+		  
+		# If the app is not enabled, Install (or Upgrade) the app as needed, update
+		# the config as necessary to support the other associated apps and start the app
+		elif ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+
+			# Upgrade the app
+			if sickrage__version_check; then	
+				sickrage__upgrade
+			fi
+			
+			# Enable the app
+			sickrage__enable
+			
+			# Update SABnzbd+ Support
+			sabnzbdPort=$(sabnzbd__get_port)
+			sabnzbdAPIkey=$(sabnzbd__get_apikey)
+			sabnzbdUser=$(sabnzbd__get_username)
+			sabnzbdPass=$(sabnzbd__get_password)
+			sickrage__config_sabnzbd "$sabnzbdPort" "$sabnzbdAPIkey" "$sabnzbdUser" "$sabnzbdPass"
+
+			# Enable Plex Server Support
+			sickrage__config_plexserver
+			
+			# Enable Reverse Proxy Support
+			if echo "$(proxy__get_status)" | grep -q "^Enabled"; then
+			  sickrage__config_proxy
+			  
+				sickragePort=$(sickrage__get_port)
+				proxy__config_sickrage "$sickragePort"
+				proxy__start
+			fi
+
+      # Start the app
+			sickrage__start
+		fi
 
 		# Transmission Section
 		# ---------------------------
@@ -1869,6 +2265,41 @@ function apps__allapps() {
 			transmission__start
 		fi
 		
+		# Deluge-Web Section
+		# ---------------------------
+
+    # If the app is already enabled and running there's nothing to do
+    if [ "$(delugeweb__get_status)" == "Enabled|Running" ]; then
+      echo "Deluge-Web is already enabled"
+    
+    # If the app is already enabled but stopped, start the app
+    elif [ "$(delugeweb__get_status)" == "Enabled|Stopped" ]; then
+		  # Start the app
+		  delugeweb__start
+		  
+		# If the app is not enabled, Install (or Upgrade) the app as needed, update
+		# the config as necessary to support the other associated apps and start the app
+		elif ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+
+			# Upgrade the app
+			if delugeweb__version_check; then	
+				delugeweb__upgrade
+			fi
+			
+			# Enable the app
+			delugeweb__enable
+			
+			# Enable Reverse Proxy Support
+			if echo "$(proxy__get_status)" | grep -q "^Enabled"; then
+				delugewebPort=$(delugeweb__get_port)
+				proxy__config_delugeweb "$delugewebPort"
+				proxy__start
+			fi
+
+      # Start the app
+			delugeweb__start
+		fi
+		
 	elif [ "$option" == "disable" ]; then
 	  apps__couchpotato "disable"
 	  apps__headphones "disable"
@@ -1876,7 +2307,9 @@ function apps__allapps() {
 	  apps__plexserver "disable"
 	  apps__sabnzbd "disable"
 	  apps__sickbeard "disable"
+	  apps__sickrage "disable"
 	  apps__transmission "disable"
+	  apps__delugeweb "disable"
 
 	elif [ "$option" == "upgrade" ]; then  
 		echo "* Updating apt repository package lists"
@@ -1943,6 +2376,17 @@ function apps__allapps() {
 				sickbeard__start
 			fi
     fi
+		
+		# Sick Rage Section
+		# ---------------------------
+	  if ! echo "$(sickrage__get_status)" | grep -q "^Enabled"; then
+	    echo "Sick Beard is disabled"
+	  else
+			if sickrage__version_check; then
+				sickrage__upgrade
+				sickrage__start
+			fi
+    fi
     
 		# Transmission Section
 		# ---------------------------
@@ -1952,6 +2396,17 @@ function apps__allapps() {
 			if transmission__version_check; then
 				transmission__upgrade
 				transmission__start
+			fi
+    fi
+	
+		# Deluge-Web Section
+		# ---------------------------
+	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
+	    echo "Deluge-Web is disabled"
+	  else
+			if delugeweb__version_check; then
+				delugeweb__upgrade
+				delugeweb__start
 			fi
     fi
     
@@ -1964,7 +2419,9 @@ function apps__allapps() {
 	  apps__plexserver "set username" "$username"
 	  apps__sabnzbd "set username" "$username"
 	  apps__sickbeard "set username" "$username"
+	  apps__sickrage "set username" "$username"
 	  apps__transmission "set username" "$username"
+	  apps__delugeweb "set username" "$username"
 
   elif [ "$option" == "set password" ]; then
 	  password="$2"
@@ -1975,7 +2432,9 @@ function apps__allapps() {
 	  apps__plexserver "set password" "$password"
 	  apps__sabnzbd "set password" "$password"
 	  apps__sickbeard "set password" "$password"
+	  apps__sickrage "set password" "$password"
 	  apps__transmission "set password" "$password"
+	  apps__delugeweb "set password" "$password"
 	  
   elif [ "$option" == "new apikey" ]; then
 	  apps__couchpotato "new apikey"
@@ -1984,7 +2443,9 @@ function apps__allapps() {
 	  apps__plexserver "new apikey"
 	  apps__sabnzbd "new apikey"
 	  apps__sickbeard "new apikey"
+	  apps__sickrage "new apikey"
 	  apps__transmission "new apikey"
+	  apps__delugeweb "new apikey"
 	
 	elif [ "$option" == "show config" ]; then
 		tmpfile="/tmp/showconfig.out"
@@ -2005,6 +2466,12 @@ function apps__allapps() {
 		echo >> $tmpfile
 		echo >> $tmpfile
 		(sickbeard__show_config) >> $tmpfile
+		echo >> $tmpfile
+		echo >> $tmpfile
+		(sickrage__show_config) >> $tmpfile
+		echo >> $tmpfile
+		echo >> $tmpfile
+		(delugeweb__show_config) >> $tmpfile
 		echo >> $tmpfile
 		echo >> $tmpfile
 		(transmission__show_config) >> $tmpfile

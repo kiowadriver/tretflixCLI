@@ -214,6 +214,32 @@ function proxy__set_sickbeard_location() {
 	fi
 }
 
+function proxy__set_sickrage_location() {
+        host="$1"
+        host=$(echo "$host" | sed 's/\//\\\//g')
+
+        if ! grep -q "<Location /sickrage>" "$proxyConfig"; then
+          location="
+            <Location /sickrage>
+      order deny,allow
+      deny from all
+      allow from all
+      ProxyPass http://$host/sickrage
+      ProxyPassReverse http://$host/sickrage
+      </Location>"
+
+    location=$(echo "$location" | sed -e 's/^[ \t]*//')
+
+    proxy__stop
+    echo "$location" >> $proxyConfig
+
+  elif ! grep -q "$host/sickrage" $proxyConfig; then
+    proxy__stop
+          sed -i '/^ProxyPass http:.*sickrage$/s/localhost:[0-9]*/'$host'/' $proxyConfig
+          sed -i '/^ProxyPassReverse http:.*sickrage$/s/localhost:[0-9]*/'$host'/' $proxyConfig
+        fi
+}
+
 function proxy__set_transmission_location() {
 	host="$1"
 	host=$(echo "$host" | sed 's/\//\\\//g')
@@ -238,6 +264,32 @@ function proxy__set_transmission_location() {
 	  sed -i '/^ProxyPass http:.*transmission$/s/localhost:[0-9]*/'$host'/' $proxyConfig
 	  sed -i '/^ProxyPassReverse http:.*transmission$/s/localhost:[0-9]*/'$host'/' $proxyConfig
 	fi
+}
+
+function proxy__set_delugeweb_location() {
+        host="$1"
+        host=$(echo "$host" | sed 's/\//\\\//g')
+
+        if ! grep -q "<Location /deluge>" "$proxyConfig"; then
+          location="
+            <Location /deluge>
+      order deny,allow
+      deny from all
+      allow from all
+      ProxyPass http://$host/deluge
+      ProxyPassReverse http://$host/deluge
+      </Location>"
+
+    location=$(echo "$location" | sed -e 's/^[ \t]*//')
+
+    proxy__stop
+    echo "$location" >> $proxyConfig
+
+  elif ! grep -q "$host/deluge" $proxyConfig; then
+    proxy__stop
+          sed -i '/^ProxyPass http:.*delugeweb$/s/localhost:[0-9]*/'$host'/' $proxyConfig
+          sed -i '/^ProxyPassReverse http:.*delugeweb$/s/localhost:[0-9]*/'$host'/' $proxyConfig
+        fi
 }
 
 
@@ -299,6 +351,28 @@ function proxy__config_sickbeard() {
   proxy__set_sickbeard_location "$host:$port"
 }
 
+# Sick Rage Section
+# ---------------------------
+
+function proxy__config_sickrage() {
+        port="$1"
+  host="localhost"
+
+  echo "* Updating Reverse Proxy's Sick Rage Support"
+  proxy__set_sickrage_location "$host:$port"
+}
+
+# Deluge-Web Section
+# ---------------------------
+
+function proxy__config_delugeweb() {
+        port="$1"
+  host="localhost"
+
+  echo "* Updating Reverse Proxy's Deluge-Web Support"
+  proxy__set_delugeweb_location "$host:$port"
+}
+
 # Transmission Section
 # ---------------------------
 
@@ -327,10 +401,12 @@ function proxy__install() {
   # Link the necessary modules (enables them)
   if [ ! -f "/etc/apache2/mods-enabled/proxy.load" ]; then
     ln -s /etc/apache2/mods-available/proxy.load /etc/apache2/mods-enabled/proxy.load
+    #sudo a2enmod proxy
   fi
   
   if [ ! -f "/etc/apache2/mods-enabled/proxy_http.load" ]; then
     ln -s /etc/apache2/mods-available/proxy_http.load /etc/apache2/mods-enabled/proxy_http.load
+    #sudo a2enmod proxy_http
   fi
   
   if [ ! -f "/etc/apache2/sites-enabled/proxiedhosts" ]; then
