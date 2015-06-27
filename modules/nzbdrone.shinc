@@ -235,7 +235,7 @@ function nzbdrone__set_sabnzbd_settings() {
   # Get the existing SABnzbd record "Settings"
 	settings=$(nzbdrone__get_sabnzbd_settings)
 	
-	# Modify the existing SABnzbd record "Settings"
+	# Modifwy the existing SABnzbd record "Settings"
 	settings=$(echo "$settings" | sed 's/  "username": ".*",$/  "username": "'$username'",/')
 	settings=$(echo "$settings" | sed 's/  "password": ".*",$/  "password": "'$password'",/')
 	settings=$(echo "$settings" | sed 's/  "host": ".*",$/  "host": "'$host'",/')
@@ -337,7 +337,7 @@ function nzbdrone__install() {
   echo "* Installing NzbDrone"
   
     # Add the updated libmono apt repository
-  if [ ! -f "/etc/apt/sources.list.d/directhex-monoxide-precise.list" ]; then
+  if [ ! -f "/etc/apt/sources.list.d/directhex-monoxide-trusty.list" ]; then
     add-apt-repository -y ppa:directhex/monoxide
     
     # Update apt repository package lists
@@ -397,12 +397,44 @@ function nzbdrone__install() {
   fi
 }
 
+function nzbdrone__uninstall() {
+  echo "* Uninstalling NzbDrone"
+  echo
+
+   nzbdrone__stop
+
+    # Remove the updated libmono apt repository
+  if [ -f "/etc/apt/sources.list.d/directhex-monoxide-trusty.list" ]; then
+    
+     sudo rm /etc/apt/sources.list.d/directhex-monoxide-trusty.list
+
+    # Update apt repository package lists
+    sudo apt-get -y update
+  fi
+
+  # uninstall updated libmono and nzbdrone
+  sudo apt-get -y -q purge libmono-2.0-1 nzbdrone
+
+  # Remove the init file
+  if [ -e "/etc/init/nzbdrone.conf" ]; then
+    sudo rm /etc/init/nzbdrone.conf
+    sudo rm /etc/default/nzbdrone*
+  fi
+
+  # Remove the config/data directory into appdata
+  if [ -d "$nzbdroneData" ]; then
+    sudo rm -r "$tretflixPath/appdata/nzbdrone"
+  fi
+
+}
+
+
 function nzbdrone__upgrade() {  
   echo "* Upgrading NzbDrone"
   
   nzbdrone__stop
   apt-get -q -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-    install nzbdrone
+    uninstall nzbdrone
 }
 
 function nzbdrone__version_check() {

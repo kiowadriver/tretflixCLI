@@ -34,6 +34,7 @@ function delugeweb__show_config() {
   if [ "$status" == "Enabled|Running" ]; then
 		password=$(delugeweb__get_password)
 		port=$(delugeweb__get_port)
+		webroot=$(delugeweb__get_webroot)
 		defaultDaemonHost=$(delugeweb__get_defaultDaemonHost)
 		defaultDaemonPort=$(delugeweb__get_defaultDaemonPort)
 		ipv4=$(tools__get_ip)
@@ -41,7 +42,7 @@ function delugeweb__show_config() {
 		if echo "$(proxy__get_status)" | egrep -q "^Enabled|Running$"; then
 			url="http://$ipv4/delugeweb"
 		else
-			url="http://$ipv4:$port/"
+			url="http://$ipv4:$port$webroot"
 		fi
 		
     echo "Web UI: $url"
@@ -106,24 +107,40 @@ function delugeweb__stop() {
 # ---------------------------------------------------------------------------------------
 
 function delugeweb__get_password() {
-  password=$(grep "pwd_sha1" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",')
 
-  echo "$password"
+  echo "(ENCRYPTED SHA1)"
+}
+
+function delugeweb__get_pwd_sha1() {
+  $pwd_sha1=$(grep "pwd_sha1" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",' | sed 's/ //g')
+
+  echo "$pwd_sha1"
+}
+
+function delugeweb__get_pwd_salt() {
+  pwd_salt=$(grep "pwd_salt" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",' | sed 's/ //g')
+
+  echo "$pwd_salt"
 }
 
 function delugeweb__get_port() {
-  port=$(grep "port" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",')
+  port=$(grep "port" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",' | sed 's/ //g')
   echo "$port"
 }
 
+function delugeweb__get_webroot() {
+  webroot=$(grep "base" $delugewebConfig | awk -F ": " '{print $2}' | tr -d '",' | sed 's/ //g')
+  echo "$webroot"
+}
+
 function delugeweb__get_defaultDaemonHost() {
-  defaultDaemonHost=$(grep "default_daemon" $delugewebConfig | awk -F ': ' '{print $2}' | tr -d '",' | awk -F ":" '{print $1}')
+  defaultDaemonHost=$(grep "default_daemon" $delugewebConfig | awk -F ': ' '{print $2}' | tr -d '",' | awk -F ":" '{print $1}' | sed 's/ //g')
 
   echo "$defaultDaemonHost"
 }
 
 function delugeweb__get_defaultDaemonPort() {
-  defaultDaemonPort=$(grep "<default_daemon>.*</default_daemon>" $delugewebConfig | awk -F ': ' '{print $2}' | tr -d '",' | awk -F ":" '{print $2}')
+  defaultDaemonPort=$(grep "<default_daemon>.*</default_daemon>" $delugewebConfig | awk -F ': ' '{print $2}' | tr -d '",\t\n\r' | awk -F ":" '{print $2}')
   
   echo "$defaultDaemonPort"
 }
@@ -147,11 +164,22 @@ function delugeweb__get_plexserver_settings() {
 
 function delugeweb__set_password() {
   password="$1"
-  password=$(echo "$password" | sed 's/\//\\\//g')
+  password=$(echo "$password" | sed 's/ //g')
 
+  # Must stop the process to write a new pwd
   delugeweb__stop
-  #sed -i 's#\(<Password>\).*\(</Password>\)#\1'$password'\2#g' $delugewebConfig
- echo "ERROR: Not sure I can even set the password in this file, it is encrypted. No action."
+
+  # pwd is crated from Salt contained in the config file
+  salt=$(delugeweb__get_pwd_salt)
+
+  # create new sha1 password hash
+  pwd_sha1=$(echo -n "$salt$password" | openssl dgst -sha1 | awk '{print $NF}') 	
+   
+  echo $pwd_sha1
+  echo $delugewebConfig
+
+  #write the new password to the file
+  sed -i 's/^  "pwd_sha1":.*/  "pwd_sha1": "'$pwd_sha1'",/'  $delugewebConfig
 }
 
 function delugeweb__set_port() {
@@ -159,7 +187,7 @@ function delugeweb__set_port() {
   port=$(echo "$port" | sed 's/\//\\\//g')
 
   delugeweb__stop
-  sed -i 's/^  "port":.*/  "port": $port,/'  $delugewebConfig
+  sed -i 's/^  "port":.*/  "port": '$port',/'  $delugewebConfig
 }
 
 function delugeweb__set_defaultDaemon() {
@@ -167,22 +195,17 @@ function delugeweb__set_defaultDaemon() {
   defaultDaemon=$(echo "$defaultDaemonHost:$defaultDaemonPort" | sed 's/\//\\\//g')
 
   delugeweb__stop
-  sed -i 's/^  "default_daemon":.*/  "default_daemon": "$defaultDaemon",/' $delugewebConfig
+  sed -i 's/^  "default_daemon":.*/  "default_daemon": '$defaultDaemon',/' $delugewebConfig
 }
 
 function delugeweb__set_urlbase() {
-  urlbase="delugeweb"
+  urlbase="/deluge"
   urlbase=$(echo "$urlbase" | sed 's/\//\\\//g')
 
   delugeweb__stop
-  if grep -A 1 "<UrlBase>$" $delugewebConfig | grep -q "</UrlBase>$"; then
-#    sed -i '/<\/UrlBase>$/d' $delugewebConfig
-#    sed -i 's/<UrlBase>$/<UrlBase><\/UrlBase>/' $delugewebConfig
-  echo "fix deluge set url base!!!" 
- fi
   
-#  sed -i 's#\(<UrlBase>\).*\(</UrlBase>\)#\1'$urlbase'\2#g' $delugewebConfig
-  echo "fix deluge url base!!!"
+  sed -i 's/^  "base":.*/  "base": '$urlbase',/' $delugewebConfig
+
   
 }
 
@@ -192,7 +215,7 @@ function delugeweb__set_delugeweb_enabled() {
 		settings="
 		\"host\": \"localhost\",
 		\"port\": 8112,
-		\"password\"; \"admin\",		
+		\"password\"; \"5273b22345cc5b93642a941021157fad2514aa4a\",		
 		\"defaultDaemonHost\": \"localhost\",
 		\"defaultDaemonPort\"; \"58846\",
 		\"useSsl\": false"
@@ -290,7 +313,7 @@ function delugeweb__install() {
   
   # Install deluge-web
   apt-get -q -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-    install deluge-web
+    install deluge-web openssl
   
   # Stop the app, apt-get install sometimes automatically enables and starts apps
   delugeweb__stop
@@ -308,6 +331,39 @@ function delugeweb__install() {
     sudo ln -s /lib/init/upstart-job /etc/init.d/deluge-web
   
 }
+
+function delugeweb__uninstall() {
+  echo "* Uninstalling Deluge-Web"
+
+  # Stop the app
+  delugeweb__stop
+
+  # uninstall deluge-web
+  sudo apt-get -q -y purge deluge-web
+  sudo apt-get -y autoremove
+
+  # Remove the init 
+  if [ -e "/etc/init/deluge-web.conf" ]; then
+    sudo rm "/etc/init/deluge-web.conf"
+  fi
+
+  # Remove the override                    
+  if [ -e "/etc/init/deluge-web.override" ]; then
+    sudo rm -v "/etc/init/deluge-web.override"
+  fi
+
+ # Remove the init.d symlink to upstart
+  if [ -e "/etc/init.d/deluge-web" ]; then
+    sudo rm "/etc/init.d/deluge-web"
+  fi
+
+  # Remove the appdata directory
+  if [ -d "$tretflixPath/appdata/delugeweb" ]; then
+    sudo rm -r "$tretflixPath/appdata/delugeweb"
+  fi
+
+}
+
 
 function delugeweb__upgrade() {  
   echo "* Upgrading delugeweb"

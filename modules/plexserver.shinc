@@ -186,6 +186,23 @@ function plexserver__install() {
   tar xf $configBundle --strip-components 2 -C /etc/default/ config/default/plexmediaserver
 }
 
+
+function plexserver__uninstall() {
+
+  echo "* Uninstalling Plex Media Server and purging config files"
+  echo
+
+  # Stop the app
+  plexserver__stop
+
+  # remove plex
+  sudo apt-get -y -q remove --purge plexmediaserver
+
+  sudo apt-get -y autoremove
+
+}
+
+
 function plexserver__upgrade() {
   username=$(plexserver__get_plexpass_username)
 	password=$(plexserver__get_plexpass_password)

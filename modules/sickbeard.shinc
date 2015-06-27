@@ -35,13 +35,14 @@ function sickbeard__show_config() {
 		username=$(sickbeard__get_username)
 		password=$(sickbeard__get_password)
 		port=$(sickbeard__get_port)
+		webroot=$(sickbeard__get_webroot)
 		apikey=$(sickbeard__get_apikey)
 		ipv4=$(tools__get_ip)
 	
 		if echo "$(proxy__get_status)" | egrep -q "^Enabled|Running$"; then
 			url="http://$ipv4/sickbeard"
 		else
-			url="http://$ipv4:$port/"
+			url="http://$ipv4:$port$webroot"
 		fi
 		
     echo "Web UI: $url"
@@ -120,6 +121,13 @@ function sickbeard__get_port() {
   
   echo "$port"
 }
+
+function sickbeard__get_webroot() {
+  webroot=$(sed -n '/^\[General\]/,/^\[/p' $sickbeardConfig | grep "^web_root " | awk '{ print $3 }')
+
+  echo "$webroot"
+}
+
 
 function sickbeard__get_apikey() {
   apikey=$(sed -n '/^\[General\]/,/^\[/p' $sickbeardConfig | grep "^api_key " | awk '{ print $3 }')
@@ -309,6 +317,34 @@ function sickbeard__install() {
       "tar xf $appdataBundle --strip-components 1 -C $tretflixPath/appdata/ appdata/sickbeard"
   fi
 }
+
+function sickbeard__uninstall() {
+  echo "* Uninstalling Sick Beard..."
+  echo
+
+  sickbeard__disable
+
+  # Remove source directory
+  if [ -d "$sickbeardData" ]; then
+    sudo rm -r $sickbeardSource
+  fi
+
+  # Remove the init file
+  if [ -e "/etc/init.d/sickbeard" ]; then
+    sudo rm /etc/init.d/sickbeard
+  fi
+
+  # Remove the default config file
+  if [ -e "/etc/default/sickbeard" ]; then
+    sudo rm /etc/default/sickbeard
+  fi
+
+  # Copy the config/data directory into appdata
+  if [ -d "$sickbeardData" ]; then
+    sudo rm -r "$tretflixPath/appdata/sickbeard"
+  fi
+}
+
 
 function sickbeard__upgrade() {
   echo "* Upgrading Sick Beard"

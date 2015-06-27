@@ -16,6 +16,7 @@ function apps__help() {
   echo "  tretflix apps [OPTION] set port [PORT]"
   echo "  tretflix apps [OPTION] new apikey"
   echo "  tretflix apps [OPTION] show config"
+  echo "  tretflix apps [OPTION] uninstall  (WARNING ALL APP DATA WILL BE ERASED)"
   echo
   echo "OPTIONS:"
   echo "  -a, --all"
@@ -74,7 +75,7 @@ function apps__command_handler() {
         else
           apps__help
         fi
-        ;;			
+        ;;
       *)
         apps__help
     esac
@@ -97,6 +98,13 @@ function apps__command_handler() {
       upgrade)
         if [ "${#CLI_ARGS[@]}" -eq 3 ]; then
           apps__upgrade "${CLI_ARGS[1]}"
+        else
+          apps__help
+        fi
+        ;;
+	uninstall)
+        if [ "${#CLI_ARGS[@]}" -eq 3 ]; then
+          apps__uninstall "${CLI_ARGS[1]}"
         else
           apps__help
         fi
@@ -702,6 +710,55 @@ function apps__show_config() {
 	esac
 }
 
+function apps__uninstall() {
+  option="$1"
+  
+	case "$option" in
+		'-a' | '--all')
+      apps__allapps "uninstall"
+      apps__allapps "show config"
+			;;
+		'-c' | '--couchpotato')
+			couchpotato__uninstall
+			couchpotato__show_config
+			;;
+		'-h' | '--headphones')
+			headphones__uninstall
+			headphones__show_config
+			;;
+		'-n' | '--nzbdrone')
+			nzbdrone__uninstall
+			nzbdrone__show_config
+			;;
+		'-p' | '--plexserver')
+			plexserver__uninstall
+			plexserver__show_config
+			;;
+		'-s' | '--sabnzbd')
+			sabnzbd__uninstall
+			sabnzbd__show_config
+			;;
+		'-b' | '--sickbeard')
+			sickbeard__uninstall
+			sickbeard__show_config
+			;;
+                '-r' | '--sickrage')
+                        sickrage__uninstall
+                        sickrage__show_config
+                        ;;
+		'-t' | '--transmission')
+			transmission__uninstall
+			transmission__show_config
+			;;
+		'-d' | '--delugeweb')
+                        delugeweb__uninstall
+                        delugeweb__show_config
+                        ;;
+		*)
+			apps__help
+	esac
+}
+
 function apps__couchpotato() {
   option="$1"
   
@@ -809,6 +866,10 @@ function apps__couchpotato() {
 				proxy__start
 			fi
 	  fi
+
+	elif [ "$option" == "uninstall" ]; then
+	  couchpotato__uninstall
+	
 		
 	elif [ "$option" == "new apikey" ]; then
 	  if ! echo "$(couchpotato__get_status)" | grep -q "^Enabled"; then
@@ -932,6 +993,9 @@ function apps__headphones() {
 				proxy__start
 			fi
 	  fi
+
+        elif [ "$option" == "uninstall" ]; then
+          headphones__uninstall
 		
 	elif [ "$option" == "new apikey" ]; then
 	  if ! echo "$(headphones__get_status)" | grep -q "^Enabled"; then
@@ -1050,6 +1114,9 @@ function apps__nzbdrone() {
 			nzbdrone__start
 	  fi
 		
+	elif [ "$option" == "uninstall" ]; then
+          nzbdrone__uninstall	
+
 	elif [ "$option" == "set port" ]; then
 	  port="$2"
 	  
@@ -1164,6 +1231,9 @@ function apps__plexserver() {
 			plexserver__set_plexpass_password "$password"
 	  fi
 	  		
+	elif [ "$option" == "uninstall" ]; then
+          plexserver__uninstall
+	
 	elif [ "$option" == "set port" ]; then
 	  echo "The 'set port' command is not available for Plex Media Server"
 	  echo
@@ -1380,8 +1450,11 @@ function apps__sabnzbd() {
 				proxy__config_sabnzbd "$port"
 				proxy__start
 			fi
-		fi
-		
+		fi		
+	
+	elif [ "$option" == "uninstall" ]; then
+          sabnzbd__uninstall
+
 	elif [ "$option" == "new apikey" ]; then
 	  if ! echo "$(sabnzbd__get_status)" | grep -q "^Enabled"; then
 	    echo "SABnzbd+ is disabled"
@@ -1541,6 +1614,9 @@ function apps__sickbeard() {
 			fi
 		fi
 		
+	elif [ "$option" == "uninstall" ]; then
+          sickbeard__uninstall	
+
 	elif [ "$option" == "new apikey" ]; then
 	  if ! echo "$(sickbeard__get_status)" | grep -q "^Enabled"; then
 	    echo "Sick Beard is disabled"
@@ -1653,6 +1729,9 @@ function apps__sickrage() {
 			sickrage__start
 		fi
 		
+	elif [ "$option" == "uninstall" ]; then
+          sickrage__uninstall
+
 	elif [ "$option" == "set port" ]; then
 	  port="$2"
 
@@ -1767,6 +1846,9 @@ function apps__transmission() {
 			transmission__start
 		fi
 		
+	elif [ "$option" == "uninstall" ]; then
+          transmission__uninstall	
+
 	elif [ "$option" == "set port" ]; then
 	  port="$2"
 	  
@@ -1835,14 +1917,14 @@ function apps__delugeweb() {
 	
 	elif [ "$option" == "disable" ]; then
 	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
-	    echo "Transmission is already disabled"
+	    echo "Deluge-Web is already disabled"
 	  else
 		  delugeweb__disable
 		fi
 		
 	elif [ "$option" == "upgrade" ]; then
 	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
-	    echo "Transmission is disabled"
+	    echo "Deluge-Web is disabled"
 	  else
 			echo "* Updating apt repository package lists"
 			apt-get update
@@ -1857,9 +1939,9 @@ function apps__delugeweb() {
 	  username="$2"
 	  
 	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
-	    echo "Transmission is disabled"
+	    echo "Deluge-Web is disabled"
 	  else
-			echo "* Configuring Transmission"
+			echo "* Configuring Deluge-Web"
 			delugeweb__set_username "$username"
 			delugeweb__start
 		fi
@@ -1868,20 +1950,23 @@ function apps__delugeweb() {
 	  password="$2"
 	  
 	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
-	    echo "Transmission is disabled"
+	    echo "Deluge-Web is disabled"
 	  else
-			echo "* Configuring Transmission"
+			echo "* Configuring Deluge-Web"
 			delugeweb__set_password "$password"
 			delugeweb__start
 		fi
 		
+	elif [ "$option" == "uninstall" ]; then
+          delugeweb__uninstall	
+
 	elif [ "$option" == "set port" ]; then
 	  port="$2"
 	  
 	  if ! echo "$(delugeweb__get_status)" | grep -q "^Enabled"; then
-	    echo "Transmission is disabled"
+	    echo "Deluge-Web is disabled"
 	  else
-			echo "* Configuring Transmission"
+			echo "* Configuring Deluge-Web"
 			delugeweb__set_port "$port"
 			delugeweb__start
 			
@@ -1892,7 +1977,7 @@ function apps__delugeweb() {
 		fi
 		
 	elif [ "$option" == "new apikey" ]; then
-	  echo "The 'new apikey' command is not available for Transmission"
+	  echo "The 'new apikey' command is not available for Deluge-Web"
 	  echo
 	  exit 1
 	fi
@@ -2478,5 +2563,39 @@ function apps__allapps() {
 
 		cat $tmpfile | more
 		rm -f $tmpfile > /dev/null 2>&1
-	fi
+
+ 	elif [ "$option" == "uninstall" ]; then
+                echo "* Updating apt repository package lists"
+                apt-get update
+
+                # Make sure all apps are installed first
+                if [ "$(couchpotato__get_status)" == "Installed" ]; then
+                        couchpotato__uninstall
+                fi
+                if [ "$(headphones__get_status)" == "Installed" ]; then
+                        headphones__uninstall
+                fi
+                if [ "$(nzbdrone__get_status)" == "Installed" ]; then
+                        nzbdrone__uninstall
+                fi
+                if [ "$(plexserver__get_status)" == "Installed" ]; then
+                        plexserver__uninstall
+                fi
+                if [ "$(sabnzbd__get_status)" == "Installed" ]; then
+                        sabnzbd__uninstall
+                fi
+                if [ "$(sickbeard__get_status)" == "Installed" ]; then
+                        sickbeard__uninstall
+                fi
+                if [ "$(sickrage__get_status)" == "Installed" ]; then
+                        sickrage__uninstall
+                fi
+                if [ "$(transmission__get_status)" == "Installed" ]; then
+                        transmission__uninstall
+                fi
+                if [ "$(delugeweb__get_status)" == "Installed" ]; then
+                        delugeweb__uninstall
+                fi	
+
+fi
 }

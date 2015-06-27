@@ -35,13 +35,14 @@ function headphones__show_config() {
 		username=$(headphones__get_username)
 		password=$(headphones__get_password)
 		port=$(headphones__get_port)
+		webroot=$(headphones__get_webroot)
 		apikey=$(headphones__get_apikey)
 		ipv4=$(tools__get_ip)
 	
 		if echo "$(proxy__get_status)" | egrep -q "^Enabled|Running$"; then
 			url="http://$ipv4/headphones"
 		else
-			url="http://$ipv4:$port/"
+			url="http://$ipv4:$port$webroot"
 		fi
 		
     echo "Web UI: $url"
@@ -119,6 +120,12 @@ function headphones__get_port() {
   port=$(sed -n '/^\[General\]/,/^\[/p' $headphonesConfig | grep "^http_port " | awk '{ print $3 }')
   
   echo "$port"
+}
+
+function headphones__get_webroot() {
+  webroot=$(sed -n '/^\[General\]/,/^\[/p' $headphonesConfig | grep "^http_root " | awk '{ print $3 }')
+
+  echo "$webroot"
 }
 
 function headphones__get_apikey() {
@@ -277,6 +284,34 @@ function headphones__install() {
       "tar xf $appdataBundle --strip-components 1 -C $tretflixPath/appdata/ appdata/headphones"
   fi
 }
+
+function headphones__uninstall() {
+  echo "* Uninstalling Headphones..."
+  echo
+
+  headphones__disable
+
+  # Remove source directory
+  if [ -d "$headphonesData" ]; then
+    sudo rm -r $headphonesSource
+  fi
+
+  # Remove the init file
+  if [ -e "/etc/init.d/headphones" ]; then
+    sudo rm /etc/init.d/headphones
+  fi
+
+  # Remove the default config file
+  if [ -e "/etc/default/headphones" ]; then
+    sudo rm /etc/default/headphones
+  fi
+
+  # Copy the config/data directory into appdata
+  if [ -d "$headphonesData" ]; then
+    sudo rm -r "$tretflixPath/appdata/headphones"
+  fi
+}
+
 
 function headphones__upgrade() {
   echo "* Upgrading Headphones"

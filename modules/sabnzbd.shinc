@@ -326,6 +326,23 @@ function sabnzbd__install() {
   fi
 }
 
+function sabnzbd__uninstall() {
+  echo "* Uninstalling SABnzbd+"
+
+  # Stop the app, apt-get uninstall sometimes automatically enables and starts apps
+  sabnzbd__stop
+
+  # uninstall SABnzbd+
+  sudo apt-get -q -y purge sabnzbdplus sabnzbdplus-theme-mobile
+
+  # Copy the config/data directory into appdata
+  if [ ! -d "$tretflixPath/appdata/sabnzbdplus" ]; then
+    sudo rm -r "$tretflixPath/appdata/sabnzbdplus"
+  fi
+
+}
+
+
 function sabnzbd__upgrade() {
   echo "* Upgrading SABnzbd+"
   
